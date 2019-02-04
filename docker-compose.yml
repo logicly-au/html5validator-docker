@@ -1,0 +1,7 @@
+version: "3"
+services:
+  html5validator:
+    image: stratdat/html5validator:latest
+    command: html5validator
+    build:
+      context: .
