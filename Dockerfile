@@ -1,18 +1,36 @@
-FROM python:3-slim
+FROM python:3.12.1-slim as base
 
-# Deal with bug in stretch install of openjdk-8-jre-headless
-#  hopefully not needed in future.
-RUN mkdir -p /usr/share/man/man1
+# Based on https://github.com/Cyb3r-Jak3/html5validator-docker
 
-RUN echo 'deb http://http.debian.net/debian stretch main contrib non-free' > \
-     /etc/apt/sources.list.d/stretch.list && \
-     apt-get update && \
-     apt-get install -f -y --no-install-recommends openjdk-8-jre-headless && \
-     rm /etc/apt/sources.list.d/stretch.list && \
-     apt-get clean && \
-     rm -rf /var/lib/apt/lists/*
+RUN mkdir -p /usr/share/man/man1/ \
+    && apt-get -qq update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -qq python3-pip default-jre
 
-RUN pip install html5validator
+FROM base as pypi
+
+RUN pip --no-cache-dir --disable-pip-version-check install html5validator
+
+RUN DEBIAN_FRONTEND=noninteractive apt remove -y python3-pip \
+    && apt autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
+
+FROM base as source
+
+ARG GIT_URL=https://github.com/svenkreiss/html5validator.git
+
+RUN DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y git \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir --disable-pip-version-check setuptools \
+    && git clone ${GIT_URL} \
+    && cd html5validator \
+    && python setup.py install \
+    && cd .. \
+    && rm -rf html5validator \
+    && pip uninstall --yes setuptools
+
+RUN DEBIAN_FRONTEND=noninteractive apt-get purge -y git python3-pip \
+    && apt autoremove -y
 
 WORKDIR /app
 
